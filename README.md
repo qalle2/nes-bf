@@ -1,6 +1,6 @@
 # Qalle's Brainfuck
 
-A Brainfuck interpreter for the [NES](https://en.wikipedia.org/wiki/Nintendo_Entertainment_System). Uses CHR RAM. Actual PRG ROM size is 2 KiB.
+A Brainfuck interpreter for the [NES](https://en.wikipedia.org/wiki/Nintendo_Entertainment_System). The actual size (including CHR data) is 2&nbsp;KiB.
 
 Table of contents:
 * [List of files](#list-of-files)
@@ -12,8 +12,10 @@ Table of contents:
 ## List of files
 * `assemble.sh`: a Linux script that assembles the program (warning: deletes files)
 * `bf.asm`: source code (assembles with [ASM6](https://www.romhacking.net/utilities/674/))
-* `bf.nes.gz`: assembled program (iNES format, gzip compressed)
+* `bf.nes.gz`: the assembled program (iNES format, gzip compressed)
 * `examples.txt`: Brainfuck programs
+* `hexdump.py`: a Python script that creates `hexdump.txt`
+* `hexdump.txt`: the assembled program in hexadecimal (iNES header and unused ROM space omitted)
 * `snap*.png`: screenshots
 
 ## Features
