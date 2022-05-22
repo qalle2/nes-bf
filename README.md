@@ -6,6 +6,8 @@ Table of contents:
 * [List of files](#list-of-files)
 * [Features](#features)
 * [How to use](#how-to-use)
+  * [Edit mode](#edit-mode)
+  * [Run mode](#run-mode)
 * [Character set](#character-set)
 * [References](#references)
 
@@ -16,7 +18,7 @@ Table of contents:
 * `examples.txt`: Brainfuck programs
 * `hexdump.py`: a Python script that creates `hexdump.txt`
 * `hexdump.txt`: the assembled program in hexadecimal (iNES header and unused ROM space omitted)
-* `pt-data-compress.py`: prints `pt-data.txt` in ASM6 format
+* `pt-data-compress.py`: compresses `pt-data.txt` and prints it in ASM6 format
 * `pt-data.txt`: pattern table data in a format readable by both humans and `pt-data-compress.py`
 * `snap*.png`: screenshots
 
@@ -42,7 +44,7 @@ There are two modes.
 * there are three submodes:
   * if the cursor is on the output area: the Brainfuck program is running
   * if the cursor is on the virtual keyboard: the user is expected to enter a character
-  * if the cursor is not visible: the Brainfuck program has finished or the maximum output size of 256 characters has been reached
+  * if the cursor is next to the `B=exit` text: the Brainfuck program has finished or the maximum output size has been reached
 * press B at any time to return to edit mode
 
 ## Character set

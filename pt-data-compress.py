@@ -50,10 +50,13 @@ def main():
         sys.exit("Error: number of bytes is not a multiple of 8.")
 
     # compress tiles and print them in ASM6 format
+    totalSize = 0
     for i in range(0, len(ptBytes), 8):
         compressed = compress_tile(ptBytes[i:i+8])
+        totalSize += len(compressed)
         print(16 * " " + f"hex {compressed.hex():18}  ; tile ${i//8+0x20:02x}")
 
     print(16 * " " + f"hex {'00':18}  ; end of data")
+    print("; total size:", totalSize + 1)
 
 main()

@@ -177,9 +177,8 @@ reset           ; initialize the NES; see https://wiki.nesdev.org/w/index.php/In
                 dex
                 bne -
                 ;
-                iny                     ; advance source index and add it to pointer
-                tya
-                clc
+                tya                     ; add source index + 1 to pointer
+                sec
                 adc pt_data_ptr+0
                 sta pt_data_ptr+0
                 bcc +
@@ -268,103 +267,103 @@ palette         ; copied backwards to all subpalettes
 pt_data         hex ff00                ; tile $20
                 hex fa100000            ; tile $21
                 hex 3f002828            ; tile $22
-                hex d6287c7c00          ; tile $23
-                hex 82103c5038147800    ; tile $24
-                hex 83004408102044      ; tile $25
+                hex d628fefe00          ; tile $23
+                hex 547c1050141000      ; tile $24
+                hex 80c2c4081020468600  ; tile $25
                 hex 44443828102a3a00    ; tile $26
                 hex 3f001010            ; tile $27
                 hex 38200810100800      ; tile $28
                 hex 38082010102000      ; tile $29
                 hex 83004428fe2844      ; tile $2a
                 hex ee10fe00            ; tile $2b
-                hex f100081020          ; tile $2c
+                hex f9000810            ; tile $2c
                 hex ef00fc              ; tile $2d
                 hex f9001818            ; tile $2e
                 hex 800204081020408000  ; tile $2f
                 hex 6c827c927c00        ; tile $30
                 hex bc10303800          ; tile $31
-                hex 907c82028080fe00    ; tile $32
+                hex 927c0202808000      ; tile $32
                 hex 6c02fcfcfc00        ; tile $33
-                hex 8608182848fe00      ; tile $34
+                hex e082fe02020200      ; tile $34
                 hex 6080fefc0202fc00    ; tile $35
-                hex 60807efc82827c00    ; tile $36
-                hex 80fe04081020408000  ; tile $37
+                hex 927c8080828200      ; tile $36
+                hex 1e10fe040800        ; tile $37
                 hex 6c827c7c7c00        ; tile $38
-                hex 60827c7e0202fc00    ; tile $39
-                hex bb001010            ; tile $3a
-                hex b10010102040        ; tile $3b
-                hex 8208102040201000    ; tile $3c
+                hex 927c8282020200      ; tile $39
+                hex 990018181818        ; tile $3a
+                hex 990018180810        ; tile $3b
+                hex 8204081020100800    ; tile $3c
                 hex db00fefe            ; tile $3d
-                hex 8240201008102000    ; tile $3e
-                hex 0d107c82020c00      ; tile $3f
-                hex 30ba7c82b4807e00    ; tile $40
+                hex 8220100804081000    ; tile $3e
+                hex a87c0280001000      ; tile $3f
+                hex 30ba7c82bc807e00    ; tile $40
                 hex 6e827cfe00          ; tile $41
                 hex 6c42fc7cfc00        ; tile $42
                 hex 7c807e7e00          ; tile $43
                 hex 3882f88484f800      ; tile $44
-                hex 6c80fefefe00        ; tile $45
-                hex 6e80fefe00          ; tile $46
-                hex 827e80809e828200    ; tile $47
+                hex 6c80fefcfe00        ; tile $45
+                hex 6e80fefc00          ; tile $46
+                hex 827e80808e828200    ; tile $47
                 hex ee82fe00            ; tile $48
                 hex 7c10383800          ; tile $49
-                hex f804443800          ; tile $4a
-                hex 8244485060504800    ; tile $4b
+                hex f802827c00          ; tile $4a
+                hex 82828488f0888400    ; tile $4b
                 hex fc80fe00            ; tile $4c
-                hex 8e82c6aa9200        ; tile $4d
-                hex 8282c2a2928a8600    ; tile $4e
+                hex 9e82c6ba00          ; tile $4d
+                hex c682e2928e00        ; tile $4e
                 hex 7c827c7c00          ; tile $4f
                 hex 0e80fc8282fc00      ; tile $50
-                hex 60827c928a867e00    ; tile $51
+                hex 70827c8a867e00      ; tile $51
                 hex 6282fcfc888400      ; tile $52
-                hex 60807e7c0202fc00    ; tile $53
+                hex 927c8080020200      ; tile $53
                 hex 7e10fe00            ; tile $54
                 hex fc827c00            ; tile $55
                 hex f08244281000        ; tile $56
-                hex e28292aac600        ; tile $57
+                hex f08292aa4400        ; tile $57
                 hex 8282442810284400    ; tile $58
                 hex 1e1082442800        ; tile $59
                 hex 82fe040810204000    ; tile $5a
-                hex 7c20383800          ; tile $5b
+                hex 7c203c3c00          ; tile $5b
                 hex 808040201008040200  ; tile $5c
-                hex 7c08383800          ; tile $5d
+                hex 7c043c3c00          ; tile $5d
                 hex 1f00102844          ; tile $5e
                 hex fd00fe              ; tile $5f
-                hex 1f00100804          ; tile $60
-                hex c10078043c4c34      ; tile $61
-                hex 1c444040787800      ; tile $62
-                hex c1003c4040403c      ; tile $63
-                hex 1c4404043c3c00      ; tile $64
-                hex c100384478403c      ; tile $65
-                hex 2e2018247800        ; tile $66
-                hex c000344c443c0478    ; tile $67
-                hex 0e444040586400      ; tile $68
-                hex 5e10000000          ; tile $69
-                hex 5c0800004830        ; tile $6a
-                hex c040485060504800    ; tile $6b
-                hex 7e103000            ; tile $6c
-                hex c100b6da929292      ; tile $6d
-                hex c1005864444444      ; tile $6e
-                hex c1003844444438      ; tile $6f
-                hex c000586444784040    ; tile $70
-                hex c000344c443c0404    ; tile $71
-                hex c1005c60404040      ; tile $72
-                hex c1003c40380478      ; tile $73
-                hex 58200078281000      ; tile $74
-                hex c1004444444c34      ; tile $75
-                hex c1004444282810      ; tile $76
-                hex 3c5400002800        ; tile $77
-                hex c1004428102844      ; tile $78
-                hex 384400003c0478      ; tile $79
-                hex c1007c0810207c      ; tile $7a
+                hex 3f001008            ; tile $60
+                hex c1007c027e827e      ; tile $61
+                hex 1c828080fcfc00      ; tile $62
+                hex c1007e8080807e      ; tile $63
+                hex 1c8202027e7e00      ; tile $64
+                hex c1007c82fc807c      ; tile $65
+                hex 5e100e7e00          ; tile $66
+                hex c0007c84847c0478    ; tile $67
+                hex 1e828080fc00        ; tile $68
+                hex be100000            ; tile $69
+                hex bc04004438          ; tile $6a
+                hex c040444870484400    ; tile $6b
+                hex fe1000              ; tile $6c
+                hex 1e920000fc00        ; tile $6d
+                hex 1e820000fc00        ; tile $6e
+                hex c1007c8282827c      ; tile $6f
+                hex c000bcc282fc8080    ; tile $70
+                hex c0007a86827e0202    ; tile $71
+                hex 1e800000fe00        ; tile $72
+                hex c1007c807c027c      ; tile $73
+                hex dc20fe1e00          ; tile $74
+                hex 3c8200007e00        ; tile $75
+                hex c1008282442810      ; tile $76
+                hex 3c9200006c00        ; tile $77
+                hex c100c6281028c6      ; tile $78
+                hex 388200007e027c      ; tile $79
+                hex c100fe081020fe      ; tile $7a
                 hex 6c100c600c00        ; tile $7b
                 hex ee100000            ; tile $7c
                 hex 6c10600c6000        ; tile $7d
-                hex 3f006498            ; tile $7e
+                hex 3f006698            ; tile $7e
                 hex c0042444fc402000    ; tile $7f
                 hex ffff                ; tile $80
                 hex c700ffffff          ; tile $81
-                hex 9e10385400          ; tile $82
-                hex f210543800          ; tile $83
+                hex 9f103854            ; tile $82
+                hex f9105438            ; tile $83
                 hex 83002040fe4020      ; tile $84
                 hex 83000804fe0408      ; tile $85
                 hex 00                  ; end of data
@@ -378,35 +377,27 @@ endm
 strings         ; each string: PPU address high/low, characters, null terminator
                 ; address high = 0 ends all strings
                 ;
-                nt_addr 0, 2, 7
+                nt_addr 0, 3, 7
                 db "Qalle's Brainfuck", 0
-                nt_addr 0, 4, 11
-                db "edit mode", 0
                 nt_addr 0, 6, 12
                 db "Program:", 0
                 nt_addr 0, 18, 4
-                db tile_uarr, "=+ ", tile_darr, "=-  "
-                db tile_larr, "=< ", tile_rarr, "=>  "
+                db tile_uarr, "=+ ", tile_darr, "=- "
+                db tile_larr, "=< ", tile_rarr, "=> "
                 db "B=[ A=]", 0
-                nt_addr 0, 20, 9
-                db "select+B=,", 0
-                nt_addr 0, 21, 9
-                db "select+A=.", 0
-                nt_addr 0, 22, 12
-                db "start=backspace", 0
-                nt_addr 0, 23, 5
-                db "select+start=run", 0
+                nt_addr 0, 20, 5
+                db "select+B=, select+A=.", 0
+                nt_addr 0, 22, 2
+                db "start=BkSp select+start=run", 0
                 ;
-                nt_addr 1, 2, 7
+                nt_addr 1, 3, 7
                 db "Qalle's Brainfuck", 0
-                nt_addr 1, 4, 11
-                db "run mode", 0
                 nt_addr 1, 6, 12
                 db "Output:", 0
                 nt_addr 1, 18, 9
                 db "Input (", tile_uarr, tile_darr, tile_larr, tile_rarr, "A):", 0
-                nt_addr 1, 27, 9
-                db "B=to edit mode", 0
+                nt_addr 1, 27, 13
+                db "B=exit", 0
                 ;
                 db 0  ; end of all strings
 
@@ -670,8 +661,10 @@ instr_done      stx bf_pc               ; store new program counter
 
 to_ended_mode   lda #mode_ended         ; switch to "program ended" mode
                 sta program_mode
-                lda #$ff                ; hide cursor
+                lda #(27*8-1)           ; move cursor next to "B=exit" text
                 sta sprite_data+0+0
+                lda #(19*8)
+                sta sprite_data+0+3
                 rts
 
 dec_value       lda #$ff                ; decrement RAM value
