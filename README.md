@@ -16,6 +16,8 @@ Table of contents:
 * `examples.txt`: Brainfuck programs
 * `hexdump.py`: a Python script that creates `hexdump.txt`
 * `hexdump.txt`: the assembled program in hexadecimal (iNES header and unused ROM space omitted)
+* `pt-data-compress.py`: prints `pt-data.txt` in ASM6 format
+* `pt-data.txt`: pattern table data in a format readable by both humans and `pt-data-compress.py`
 * `snap*.png`: screenshots
 
 ## Features
