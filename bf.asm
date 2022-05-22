@@ -30,6 +30,8 @@ output_len      equ $19    ; number of characters printed by the Brainfuck progr
 keyb_x          equ $1a    ; cursor X position on virtual keyboard (0-15)
 keyb_y          equ $1b    ; cursor Y position on virtual keyboard (0-5)
 stack_ptr_copy  equ $1d    ; copy of stack pointer
+pt_common       equ $1e    ; pattern table data - most common byte of tile
+pt_common_pos   equ $1f    ; pattern table data - bits denote positions of pt_common in tile
 bf_program      equ $0200  ; Brainfuck program ($100 bytes)
 brackets        equ $0300  ; target addresses of "[" and "]" ($100 bytes)
 bf_ram          equ $0400  ; RAM of Brainfuck program ($400 bytes; must be at $xx00)
@@ -147,37 +149,49 @@ reset           ; initialize the NES; see https://wiki.nesdev.org/w/index.php/In
                 dex
                 bne -
 
-                lda #<pt_data           ; copy data from array to pattern table 0, starting from
-                sta pt_data_ptr+0       ; tile $20
+                lda #<pt_data           ; extract data from array to pattern table 0
+                sta pt_data_ptr+0       ; (see "pt-data-compress.py" for format)
                 lda #>pt_data
                 sta pt_data_ptr+1
                 ;
-                ldy #$02
+                ldy #$02                ; start from tile $20
                 jsr set_ppu_addr_pg     ; 0 -> A; Y*$100+A -> PPU address
                 ;
-                tax                     ; X = 0, Y = output index within tile
-                tay
+--              ldy #0                  ; write 1 tile/round; Y = source index
+                lda (pt_data_ptr),y     ; which byte positions of tile use the most common byte
+                beq pt_data_end         ; 0 = terminator
+                sta pt_common_pos
                 ;
---              lda (pt_data_ptr,x)
-                sta ppu_data
-                iny                     ; fill 2nd bitplane of every tile with $00
-                cpy #8
-                bne +
-                lda #$00
-                jsr fill_vram           ; write A Y times
+                iny
+                lda (pt_data_ptr),y     ; what is the most common byte of tile
+                sta pt_common
                 ;
-+               inc pt_data_ptr+0
-                bne +
+                ldx #8                  ; write 1st bitplane of tile
+-               asl pt_common_pos
+                bcc +
+                lda pt_common           ; use the most common byte
+                jmp ++
++               iny                     ; copy byte from source
+                lda (pt_data_ptr),y
+++              sta ppu_data
+                dex
+                bne -
+                ;
+                iny                     ; advance source index and add it to pointer
+                tya
+                clc
+                adc pt_data_ptr+0
+                sta pt_data_ptr+0
+                bcc +
                 inc pt_data_ptr+1
                 ;
-+               lda pt_data_ptr+1
-                cmp #>pt_data_end
-                bne --
-                lda pt_data_ptr+0
-                cmp #<pt_data_end
-                bne --
++               ldy #8                  ; fill 2nd bitplane of tile with zero
+                lda #$00
+                jsr fill_vram
+                ;
+                beq --                  ; next tile (unconditional)
 
-                ldy #$20                ; fill name & attribute table 0 & 1 ($2000-$27ff) with $00
+pt_data_end     ldy #$20                ; fill name & attribute table 0 & 1 ($2000-$27ff) with $00
                 jsr set_ppu_addr_pg     ; 0 -> A; Y*$100+A -> PPU address
                 ldx #8
                 tay
@@ -247,113 +261,113 @@ palette         ; copied backwards to all subpalettes
                 db color_unused, color_unused, color_fg, color_bg
 
                 ; pattern table data
-                ; 8 bytes = 1st bitplane of 1 tile; 2nd bitplanes are all zeroes
-                ; tiles $20-$7e are ASCII
-                ; generated from "pt-data.txt" using "pt-data-compress.py"
+                ; each line encodes 8 bytes (1st bitplane of 1 tile) in 2-9 bytes
+                ; (2nd bitplane is always zero)
+                ; generated from "pt-data.txt" using "pt-data-compress.py" (see it for the format)
                 ;
-pt_data         hex 00 00 00 00 00 00 00 00  ; tile $20
-                hex 10 10 10 10 10 00 10 00  ; tile $21
-                hex 28 28 00 00 00 00 00 00  ; tile $22
-                hex 28 28 7c 28 7c 28 28 00  ; tile $23
-                hex 10 3c 50 38 14 78 10 00  ; tile $24
-                hex 00 44 08 10 20 44 00 00  ; tile $25
-                hex 38 44 28 10 2a 44 3a 00  ; tile $26
-                hex 10 10 00 00 00 00 00 00  ; tile $27
-                hex 08 10 20 20 20 10 08 00  ; tile $28
-                hex 20 10 08 08 08 10 20 00  ; tile $29
-                hex 00 44 28 fe 28 44 00 00  ; tile $2a
-                hex 10 10 10 fe 10 10 10 00  ; tile $2b
-                hex 00 00 00 00 08 10 20 00  ; tile $2c
-                hex 00 00 00 fc 00 00 00 00  ; tile $2d
-                hex 00 00 00 00 00 18 18 00  ; tile $2e
-                hex 02 04 08 10 20 40 80 00  ; tile $2f
-                hex 7c 82 82 92 82 82 7c 00  ; tile $30
-                hex 10 30 10 10 10 10 38 00  ; tile $31
-                hex 7c 82 02 7c 80 80 fe 00  ; tile $32
-                hex fc 02 02 fc 02 02 fc 00  ; tile $33
-                hex 08 18 28 48 fe 08 08 00  ; tile $34
-                hex fe 80 80 fc 02 02 fc 00  ; tile $35
-                hex 7e 80 80 fc 82 82 7c 00  ; tile $36
-                hex fe 04 08 10 20 40 80 00  ; tile $37
-                hex 7c 82 82 7c 82 82 7c 00  ; tile $38
-                hex 7c 82 82 7e 02 02 fc 00  ; tile $39
-                hex 00 10 00 00 00 10 00 00  ; tile $3a
-                hex 00 10 00 00 10 20 40 00  ; tile $3b
-                hex 08 10 20 40 20 10 08 00  ; tile $3c
-                hex 00 00 fe 00 00 fe 00 00  ; tile $3d
-                hex 40 20 10 08 10 20 40 00  ; tile $3e
-                hex 7c 82 02 0c 10 10 00 10  ; tile $3f
-                hex 7c 82 ba ba b4 80 7e 00  ; tile $40
-                hex 7c 82 82 fe 82 82 82 00  ; tile $41
-                hex fc 42 42 7c 42 42 fc 00  ; tile $42
-                hex 7e 80 80 80 80 80 7e 00  ; tile $43
-                hex f8 84 82 82 82 84 f8 00  ; tile $44
-                hex fe 80 80 fe 80 80 fe 00  ; tile $45
-                hex fe 80 80 fe 80 80 80 00  ; tile $46
-                hex 7e 80 80 9e 82 82 7e 00  ; tile $47
-                hex 82 82 82 fe 82 82 82 00  ; tile $48
-                hex 38 10 10 10 10 10 38 00  ; tile $49
-                hex 04 04 04 04 04 44 38 00  ; tile $4a
-                hex 44 48 50 60 50 48 44 00  ; tile $4b
-                hex 80 80 80 80 80 80 fe 00  ; tile $4c
-                hex 82 c6 aa 92 82 82 82 00  ; tile $4d
-                hex 82 c2 a2 92 8a 86 82 00  ; tile $4e
-                hex 7c 82 82 82 82 82 7c 00  ; tile $4f
-                hex fc 82 82 fc 80 80 80 00  ; tile $50
-                hex 7c 82 82 92 8a 86 7e 00  ; tile $51
-                hex fc 82 82 fc 88 84 82 00  ; tile $52
-                hex 7e 80 80 7c 02 02 fc 00  ; tile $53
-                hex fe 10 10 10 10 10 10 00  ; tile $54
-                hex 82 82 82 82 82 82 7c 00  ; tile $55
-                hex 82 82 82 82 44 28 10 00  ; tile $56
-                hex 82 82 82 92 aa c6 82 00  ; tile $57
-                hex 82 44 28 10 28 44 82 00  ; tile $58
-                hex 82 44 28 10 10 10 10 00  ; tile $59
-                hex fe 04 08 10 20 40 fe 00  ; tile $5a
-                hex 38 20 20 20 20 20 38 00  ; tile $5b
-                hex 80 40 20 10 08 04 02 00  ; tile $5c
-                hex 38 08 08 08 08 08 38 00  ; tile $5d
-                hex 10 28 44 00 00 00 00 00  ; tile $5e
-                hex 00 00 00 00 00 00 fe 00  ; tile $5f
-                hex 10 08 04 00 00 00 00 00  ; tile $60
-                hex 00 00 78 04 3c 4c 34 00  ; tile $61
-                hex 40 40 78 44 44 44 78 00  ; tile $62
-                hex 00 00 3c 40 40 40 3c 00  ; tile $63
-                hex 04 04 3c 44 44 44 3c 00  ; tile $64
-                hex 00 00 38 44 78 40 3c 00  ; tile $65
-                hex 18 24 20 78 20 20 20 00  ; tile $66
-                hex 00 00 34 4c 44 3c 04 78  ; tile $67
-                hex 40 40 58 64 44 44 44 00  ; tile $68
-                hex 00 10 00 10 10 10 10 00  ; tile $69
-                hex 00 08 00 08 08 08 48 30  ; tile $6a
-                hex 40 40 48 50 60 50 48 00  ; tile $6b
-                hex 30 10 10 10 10 10 10 00  ; tile $6c
-                hex 00 00 b6 da 92 92 92 00  ; tile $6d
-                hex 00 00 58 64 44 44 44 00  ; tile $6e
-                hex 00 00 38 44 44 44 38 00  ; tile $6f
-                hex 00 00 58 64 44 78 40 40  ; tile $70
-                hex 00 00 34 4c 44 3c 04 04  ; tile $71
-                hex 00 00 5c 60 40 40 40 00  ; tile $72
-                hex 00 00 3c 40 38 04 78 00  ; tile $73
-                hex 00 20 78 20 20 28 10 00  ; tile $74
-                hex 00 00 44 44 44 4c 34 00  ; tile $75
-                hex 00 00 44 44 28 28 10 00  ; tile $76
-                hex 00 00 54 54 54 54 28 00  ; tile $77
-                hex 00 00 44 28 10 28 44 00  ; tile $78
-                hex 00 00 44 44 44 3c 04 78  ; tile $79
-                hex 00 00 7c 08 10 20 7c 00  ; tile $7a
-                hex 0c 10 10 60 10 10 0c 00  ; tile $7b
-                hex 10 10 10 00 10 10 10 00  ; tile $7c
-                hex 60 10 10 0c 10 10 60 00  ; tile $7d
-                hex 64 98 00 00 00 00 00 00  ; tile $7e
-                hex 04 04 24 44 fc 40 20 00  ; tile $7f
-                hex ff ff ff ff ff ff ff ff  ; tile $80
-                hex 00 00 ff ff ff 00 00 00  ; tile $81
-                hex 10 38 54 10 10 10 10 00  ; tile $82
-                hex 10 10 10 10 54 38 10 00  ; tile $83
-                hex 00 20 40 fe 40 20 00 00  ; tile $84
-                hex 00 08 04 fe 04 08 00 00  ; tile $85
-pt_data_end
+pt_data         hex ff00                ; tile $20
+                hex fa100000            ; tile $21
+                hex 3f002828            ; tile $22
+                hex d6287c7c00          ; tile $23
+                hex 82103c5038147800    ; tile $24
+                hex 83004408102044      ; tile $25
+                hex 44443828102a3a00    ; tile $26
+                hex 3f001010            ; tile $27
+                hex 38200810100800      ; tile $28
+                hex 38082010102000      ; tile $29
+                hex 83004428fe2844      ; tile $2a
+                hex ee10fe00            ; tile $2b
+                hex f100081020          ; tile $2c
+                hex ef00fc              ; tile $2d
+                hex f9001818            ; tile $2e
+                hex 800204081020408000  ; tile $2f
+                hex 6c827c927c00        ; tile $30
+                hex bc10303800          ; tile $31
+                hex 907c82028080fe00    ; tile $32
+                hex 6c02fcfcfc00        ; tile $33
+                hex 8608182848fe00      ; tile $34
+                hex 6080fefc0202fc00    ; tile $35
+                hex 60807efc82827c00    ; tile $36
+                hex 80fe04081020408000  ; tile $37
+                hex 6c827c7c7c00        ; tile $38
+                hex 60827c7e0202fc00    ; tile $39
+                hex bb001010            ; tile $3a
+                hex b10010102040        ; tile $3b
+                hex 8208102040201000    ; tile $3c
+                hex db00fefe            ; tile $3d
+                hex 8240201008102000    ; tile $3e
+                hex 0d107c82020c00      ; tile $3f
+                hex 30ba7c82b4807e00    ; tile $40
+                hex 6e827cfe00          ; tile $41
+                hex 6c42fc7cfc00        ; tile $42
+                hex 7c807e7e00          ; tile $43
+                hex 3882f88484f800      ; tile $44
+                hex 6c80fefefe00        ; tile $45
+                hex 6e80fefe00          ; tile $46
+                hex 827e80809e828200    ; tile $47
+                hex ee82fe00            ; tile $48
+                hex 7c10383800          ; tile $49
+                hex f804443800          ; tile $4a
+                hex 8244485060504800    ; tile $4b
+                hex fc80fe00            ; tile $4c
+                hex 8e82c6aa9200        ; tile $4d
+                hex 8282c2a2928a8600    ; tile $4e
+                hex 7c827c7c00          ; tile $4f
+                hex 0e80fc8282fc00      ; tile $50
+                hex 60827c928a867e00    ; tile $51
+                hex 6282fcfc888400      ; tile $52
+                hex 60807e7c0202fc00    ; tile $53
+                hex 7e10fe00            ; tile $54
+                hex fc827c00            ; tile $55
+                hex f08244281000        ; tile $56
+                hex e28292aac600        ; tile $57
+                hex 8282442810284400    ; tile $58
+                hex 1e1082442800        ; tile $59
+                hex 82fe040810204000    ; tile $5a
+                hex 7c20383800          ; tile $5b
+                hex 808040201008040200  ; tile $5c
+                hex 7c08383800          ; tile $5d
+                hex 1f00102844          ; tile $5e
+                hex fd00fe              ; tile $5f
+                hex 1f00100804          ; tile $60
+                hex c10078043c4c34      ; tile $61
+                hex 1c444040787800      ; tile $62
+                hex c1003c4040403c      ; tile $63
+                hex 1c4404043c3c00      ; tile $64
+                hex c100384478403c      ; tile $65
+                hex 2e2018247800        ; tile $66
+                hex c000344c443c0478    ; tile $67
+                hex 0e444040586400      ; tile $68
+                hex 5e10000000          ; tile $69
+                hex 5c0800004830        ; tile $6a
+                hex c040485060504800    ; tile $6b
+                hex 7e103000            ; tile $6c
+                hex c100b6da929292      ; tile $6d
+                hex c1005864444444      ; tile $6e
+                hex c1003844444438      ; tile $6f
+                hex c000586444784040    ; tile $70
+                hex c000344c443c0404    ; tile $71
+                hex c1005c60404040      ; tile $72
+                hex c1003c40380478      ; tile $73
+                hex 58200078281000      ; tile $74
+                hex c1004444444c34      ; tile $75
+                hex c1004444282810      ; tile $76
+                hex 3c5400002800        ; tile $77
+                hex c1004428102844      ; tile $78
+                hex 384400003c0478      ; tile $79
+                hex c1007c0810207c      ; tile $7a
+                hex 6c100c600c00        ; tile $7b
+                hex ee100000            ; tile $7c
+                hex 6c10600c6000        ; tile $7d
+                hex 3f006498            ; tile $7e
+                hex c0042444fc402000    ; tile $7f
+                hex ffff                ; tile $80
+                hex c700ffffff          ; tile $81
+                hex 9e10385400          ; tile $82
+                hex f210543800          ; tile $83
+                hex 83002040fe4020      ; tile $84
+                hex 83000804fe0408      ; tile $85
+                hex 00                  ; end of data
 
 macro nt_addr _nt, _y, _x
                 ; output name table address ($2000-$27bf), high byte first
