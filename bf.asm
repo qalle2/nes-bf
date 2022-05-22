@@ -140,9 +140,8 @@ reset           ; initialize the NES; see https://wiki.nesdev.org/w/index.php/In
                 dey
                 bne --
 
-                tya                     ; fill PT0 (PPU $0000-$0fff) with $00 (Y is still 0)
+                ; fill pattern table 0 (PPU $0000-$0fff) with $00 (Y is still 0)
                 jsr set_ppu_addr_pg     ; 0 -> A; Y*$100+A -> PPU address
-                ;
                 ldx #16
 -               jsr fill_vram           ; write A Y times
                 dex
@@ -609,7 +608,7 @@ ml_prep_run2    ldy #$ff                ; hide edit cursor, reset Brainfuck prog
 
                 inc program_mode        ; switch to mode_run
 
-                rts
+rts1            rts
 
 ; --- Main loop - Brainfuck program running -------------------------------------------------------
 
@@ -621,10 +620,9 @@ ml_run          lda pad_status          ; stop program if B pressed
                 jmp to_edit_mode        ; ends with RTS
 
 +               lda vram_buf_adrhi      ; wait until NMI routine has flushed VRAM buffer
-                beq +
-                rts
+                bne rts1
 
-+               tay                     ; always 0; only used in indirect addressing
+                tay                     ; always 0; only used in indirect addressing
 
                 ldx bf_pc               ; incremented PC -> X; switch to "program ended" mode
                 inx                     ; if necessary
@@ -662,14 +660,12 @@ to_ended_mode   lda #mode_ended         ; switch to "program ended" mode
                 sta sprite_data+0+0
                 rts
 
-dec_value       lda (bf_ram_ptr),y      ; decrement RAM value
-                sec
-                sbc #1
-                jmp +
-inc_value       lda (bf_ram_ptr),y      ; increment RAM value
-                clc
-                adc #1
-+               sta (bf_ram_ptr),y
+dec_value       lda #$ff                ; decrement RAM value
+                bne +                   ; unconditional
+inc_value       lda #1                  ; increment RAM value
++               clc
+                adc (bf_ram_ptr),y
+                sta (bf_ram_ptr),y
                 jmp instr_done
 
 dec_ptr         lda bf_ram_ptr+0        ; decrement RAM pointer
@@ -727,20 +723,20 @@ output          lda (bf_ram_ptr),y      ; if newline ($0a)...
 ml_input        lda prev_pad_status     ; ignore buttons if anything was pressed on last frame
                 bne upd_keyb_cursor     ; update cursor sprite coordinates (ends with RTS)
 
-                lda pad_status          ; react to buttons
-                lsr a
-                bcs keyb_right          ; pad right
-                lsr a
-                bcs keyb_left           ; pad left
-                lsr a
-                bcs keyb_down           ; pad down
-                lsr a
-                bcs keyb_up             ; pad up
-                lsr a
-                lsr a
-                lsr a
-                bcs to_edit_mode        ; B; back to edit mode (ends with RTS)
-                bne keyb_input          ; A
+                lda pad_status          ; react to buttons (bits: A B sel st up down left right)
+                ;
+                bmi keyb_input          ; button A
+                asl a
+                bmi to_edit_mode        ; button B; back to edit mode (ends with RTS)
+                asl a
+                asl a
+                asl a
+                bmi keyb_up             ; d-pad up
+                asl a
+                bmi keyb_down           ; d-pad down
+                asl a
+                bmi keyb_left           ; d-pad left
+                bne keyb_right          ; d-pad right
                 ;
                 beq upd_keyb_cursor     ; unconditional, ends with RTS
 
@@ -753,7 +749,7 @@ keyb_left       ldx keyb_x
                 and #%00001111
                 sta keyb_x
                 bpl upd_keyb_cursor     ; unconditional, ends with RTS
-                ;
+
 keyb_down       ldx keyb_y
                 inx
                 cpx #6
@@ -766,13 +762,13 @@ keyb_up         ldx keyb_y
                 ldx #(6-1)
 +               stx keyb_y
                 jmp upd_keyb_cursor     ; ends with RTS
-                ;
+
 keyb_input      lda keyb_y              ; store character at cursor to Brainfuck RAM
                 asl a
                 asl a
                 asl a
                 asl a
-                adc #$20
+                adc #$20                ; carry is always clear
                 ora keyb_x
                 ;
                 cmp #$7f                ; return symbol ($7f) as newline ($0a)
@@ -800,17 +796,14 @@ upd_keyb_cursor lda keyb_y              ; update coordinates of keyboard cursor 
                 adc #(8*8)              ; carry is always clear
                 sta sprite_data+0+3
                 ;
-                rts
+rts2            rts
 
-; --- Main loop - Brainfuck program ended ---------------------------------------------------------
+; --- Main loop - Brainfuck program ended / subs used in more than one program mode ---------------
 
-ml_ended        lda pad_status          ; if B pressed...
+ml_ended        lda pad_status          ; if B pressed, switch to edit mode (ends with RTS)
                 and #pad_b
-                bne to_edit_mode        ; switch to edit mode (ends with RTS)
-                rts
-
-; --- Main loop - subs used in more than one program mode -----------------------------------------
-
+                beq rts2
+                ;
 to_edit_mode    lda #mode_edit          ; switch to edit mode (from run/input/ended mode)
                 sta program_mode
                 lda #%10000000          ; show edit mode name table
@@ -871,7 +864,7 @@ buf_flush_done  lda program_mode        ; if in one of "prepare to run" modes,
                 lda #$80
                 ;
 ++              jsr set_ppu_addr        ; Y*$100+A -> PPU address
-                lda #$00
+                asl a                   ; 0 -> A
                 ldx #$40
 -               sta ppu_data
                 sta ppu_data
