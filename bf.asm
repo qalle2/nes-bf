@@ -249,6 +249,7 @@ palette         ; copied backwards to all subpalettes
                 ; pattern table data
                 ; 8 bytes = 1st bitplane of 1 tile; 2nd bitplanes are all zeroes
                 ; tiles $20-$7e are ASCII
+                ; generated from "pt-data.txt" using "pt-data-compress.py"
                 ;
 pt_data         hex 00 00 00 00 00 00 00 00  ; tile $20
                 hex 10 10 10 10 10 00 10 00  ; tile $21
@@ -345,14 +346,13 @@ pt_data         hex 00 00 00 00 00 00 00 00  ; tile $20
                 hex 10 10 10 00 10 10 10 00  ; tile $7c
                 hex 60 10 10 0c 10 10 60 00  ; tile $7d
                 hex 64 98 00 00 00 00 00 00  ; tile $7e
-                ;
-                hex 04 04 24 44 fc 40 20 00  ; tile $7f (return symbol; needed in keyboard)
-                hex ff ff ff ff ff ff ff ff  ; tile $80 (solid block)
-                hex 00 00 ff ff ff 00 00 00  ; tile $81 (horizontal bar)
-                hex 10 38 54 10 10 10 10 00  ; tile $82 (up arrow)
-                hex 10 10 10 10 54 38 10 00  ; tile $83 (down arrow)
-                hex 00 20 40 fe 40 20 00 00  ; tile $84 (left arrow)
-                hex 00 08 04 fe 04 08 00 00  ; tile $85 (right arrow)
+                hex 04 04 24 44 fc 40 20 00  ; tile $7f
+                hex ff ff ff ff ff ff ff ff  ; tile $80
+                hex 00 00 ff ff ff 00 00 00  ; tile $81
+                hex 10 38 54 10 10 10 10 00  ; tile $82
+                hex 10 10 10 10 54 38 10 00  ; tile $83
+                hex 00 20 40 fe 40 20 00 00  ; tile $84
+                hex 00 08 04 fe 04 08 00 00  ; tile $85
 pt_data_end
 
 macro nt_addr _nt, _y, _x
