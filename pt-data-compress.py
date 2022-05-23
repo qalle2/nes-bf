@@ -12,7 +12,7 @@ def generate_lines():
                 yield line
 
 def generate_bytes():
-    # generate lines from generate_lines() as bytes
+    # generate lines from generate_lines() as 8-bit ints
     for line in generate_lines():
         if len(line) != 8:
             sys.exit("Error: line length is not 8.")
@@ -26,8 +26,8 @@ def compress_tile(tileBytes):
     #              (0 = end of data)
     # - 1 byte:    the most common byte
     # - 0-7 bytes: other bytes in order, with duplicates
-    # (I didn't invent this algorithm myself; IIRC, it's from some Nintendo game; perhaps
-    # Zelda/Pokemon for NES/GB/GBC)
+    # this algorithm is from Nintendo's Zelda: Oracle of Seasons/Ages; see
+    # https://www.nesdev.org/wiki/Tile_compression
 
     byteCounts = collections.Counter(tileBytes)
     # how many times do the most common bytes occur
