@@ -1,5 +1,10 @@
 ; Qalle's Brainfuck (NES, ASM6)
 
+; To do: don't print to first & last column:
+; - always filled with tile $00, incl. program & output area
+; - when user tries to type an instruction in the last column, advance program_len by 2
+; - when running, skip empty instructions
+
 ; --- Constants -----------------------------------------------------------------------------------
 
 ; notes:
