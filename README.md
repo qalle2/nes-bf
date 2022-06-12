@@ -1,10 +1,11 @@
 # Qalle's Brainfuck
 
-A Brainfuck interpreter for the [NES](https://en.wikipedia.org/wiki/Nintendo_Entertainment_System). The actual size (including CHR data) is 2&nbsp;KiB.
+A Brainfuck interpreter for the [NES](https://en.wikipedia.org/wiki/Nintendo_Entertainment_System).
 
 Table of contents:
 * [List of files](#list-of-files)
 * [Features](#features)
+* [Technical info](#technical-info)
 * [How to use](#how-to-use)
   * [Edit mode](#edit-mode)
   * [Run mode](#run-mode)
@@ -16,8 +17,6 @@ Table of contents:
 * `bf.asm`: source code (assembles with [ASM6](https://www.romhacking.net/utilities/674/))
 * `bf.nes.gz`: the assembled program (iNES format, gzip compressed)
 * `examples.txt`: Brainfuck programs
-* `hexdump.py`: a Python script that creates `hexdump.txt`
-* `hexdump.txt`: the assembled program in hexadecimal (iNES header and unused ROM space omitted)
 * `pt-data-compress.py`: compresses `pt-data.txt` and prints it in ASM6 format
 * `pt-data.txt`: pattern table data in a format readable by both humans and `pt-data-compress.py`
 * `snap*.png`: screenshots
@@ -27,6 +26,13 @@ Table of contents:
 * Brainfuck RAM size: 1 KiB
 * maximum output size: 256 bytes
 * output speed: 1 character/frame
+
+## Technical info
+* mapper: NROM
+* PRG ROM: 16 KiB
+* CHR ROM: 0 KiB (uses CHR RAM)
+* name table mirroring: vertical
+* compatibility: NTSC &amp; PAL
 
 ## How to use
 There are two modes.
