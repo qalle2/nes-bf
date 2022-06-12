@@ -16,9 +16,9 @@ Table of contents:
 * `assemble.sh`: a Linux script that assembles the program (warning: deletes files)
 * `bf.asm`: source code (assembles with [ASM6](https://www.romhacking.net/utilities/674/))
 * `bf.nes.gz`: the assembled program (iNES format, gzip compressed)
+* `chr.bin.gz`: CHR ROM data (gzip compressed)
+* `chr.png`: CHR ROM data as an image (can be encoded with `nes_chr_encode.py` in my [NES utilities](https://github.com/qalle2/nes-util))
 * `examples.txt`: Brainfuck programs
-* `pt-data-compress.py`: compresses `pt-data.txt` and prints it in ASM6 format
-* `pt-data.txt`: pattern table data in a format readable by both humans and `pt-data-compress.py`
 * `snap*.png`: screenshots
 
 ## Features
@@ -30,7 +30,7 @@ Table of contents:
 ## Technical info
 * mapper: NROM
 * PRG ROM: 16 KiB
-* CHR ROM: 0 KiB (uses CHR RAM)
+* CHR ROM: 8 KiB
 * name table mirroring: vertical
 * compatibility: NTSC &amp; PAL
 

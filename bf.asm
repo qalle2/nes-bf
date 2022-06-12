@@ -63,15 +63,25 @@ pad_r           equ 1<<0  ; right
 ; colors
 color_bg        equ $0f  ; background (black)
 color_fg        equ $30  ; foreground (white)
-color_unused    equ $25  ; unused (pink)
+color_hilite    equ $28  ; highlight  (yellow)
+color_unused    equ $25  ; unused     (pink)
 
 ; tiles
 tile_block      equ $80  ; solid block
 tile_hbar       equ $81  ; horizontal bar
-tile_uarr       equ $82  ; up arrow
-tile_darr       equ $83  ; down arrow
-tile_larr       equ $84  ; left arrow
-tile_rarr       equ $85  ; right arrow
+tile_uarr       equ $82  ; highlight color - up    arrow
+tile_darr       equ $83  ; highlight color - down  arrow
+tile_larr       equ $84  ; highlight color - left  arrow
+tile_rarr       equ $85  ; highlight color - right arrow
+tile_aupper     equ $86  ; highlight color - "A"
+tile_bupper     equ $87  ; highlight color - "B"
+tile_a          equ $88  ; highlight color - "a"
+tile_c          equ $89  ; highlight color - "c"
+tile_e          equ $8a  ; highlight color - "e"
+tile_l          equ $8b  ; highlight color - "l"
+tile_r          equ $8c  ; highlight color - "r"
+tile_s          equ $8d  ; highlight color - "s"
+tile_t          equ $8e  ; highlight color - "t"
 
 ; values for program_mode (must be 0, 1, ... because they're used as indexes to jump table)
 mode_edit       equ 0    ; editing BF program (must be 0)
@@ -89,16 +99,16 @@ blink_rate      equ 3    ; cursor blink rate (0 = fastest, 7 = slowest)
                 ; see https://wiki.nesdev.org/w/index.php/INES
                 base $0000
                 db "NES", $1a            ; file id
-                db 1, 0                  ; 16 KiB PRG ROM, 0 KiB CHR ROM (uses CHR RAM)
+                db 1, 1                  ; 16 KiB PRG ROM, 8 KiB CHR ROM
                 db %00000001, %00000000  ; NROM mapper, vertical name table mirroring
                 pad $0010, $00           ; unused
 
 ; --- Initialization ------------------------------------------------------------------------------
 
-                base $c000              ; start of PRG ROM
-                pad $f800, $ff          ; last 2 KiB of CPU address space
+                base $c000              ; last 16 KiB of CPU address space
 
 reset           ; initialize the NES; see https://wiki.nesdev.org/w/index.php/Init_code
+                ;
                 sei                     ; ignore IRQs
                 cld                     ; disable decimal mode
                 ldx #%01000000
@@ -133,64 +143,17 @@ reset           ; initialize the NES; see https://wiki.nesdev.org/w/index.php/In
                 ldy #$3f                ; set up palette (while still in VBlank; 8*4 bytes)
                 jsr set_ppu_addr_pg     ; 0 -> A; Y*$100+A -> PPU address
                 ;
-                ldy #8
---              ldx #(4-1)
+                ldy #8                  ; copy same colors to all subpalettes
+--              ldx #0
 -               lda palette,x
                 sta ppu_data
-                dex
-                bpl -
+                inx
+                cpx #4
+                bne -
                 dey
                 bne --
 
-                ; fill pattern table 0 (PPU $0000-$0fff) with $00 (Y is still 0)
-                jsr set_ppu_addr_pg     ; 0 -> A; Y*$100+A -> PPU address
-                ldx #16
--               jsr fill_vram           ; write A Y times
-                dex
-                bne -
-
-                lda #<pt_data           ; extract data from array to pattern table 0
-                sta pt_data_ptr+0       ; (see "pt-data-compress.py" for format)
-                lda #>pt_data
-                sta pt_data_ptr+1
-                ;
-                ldy #$02                ; start from tile $20
-                jsr set_ppu_addr_pg     ; 0 -> A; Y*$100+A -> PPU address
-                ;
---              ldy #0                  ; write 1 tile/round; Y = source index
-                lda (pt_data_ptr),y     ; which byte positions of tile use the most common byte
-                beq pt_data_end         ; 0 = terminator
-                sta pt_common_pos
-                ;
-                iny
-                lda (pt_data_ptr),y     ; what is the most common byte of tile
-                sta pt_common
-                ;
-                ldx #8                  ; write 1st bitplane of tile
--               asl pt_common_pos
-                bcc +
-                lda pt_common           ; use the most common byte
-                jmp ++
-+               iny                     ; copy byte from source
-                lda (pt_data_ptr),y
-++              sta ppu_data
-                dex
-                bne -
-                ;
-                tya                     ; add source index + 1 to pointer
-                sec
-                adc pt_data_ptr+0
-                sta pt_data_ptr+0
-                bcc +
-                inc pt_data_ptr+1
-                ;
-+               ldy #8                  ; fill 2nd bitplane of tile with zero
-                lda #$00
-                jsr fill_vram
-                ;
-                beq --                  ; next tile (unconditional)
-
-pt_data_end     ldy #$20                ; fill name & attribute table 0 & 1 ($2000-$27ff) with $00
+                ldy #$20                ; fill name & attribute table 0 & 1 ($2000-$27ff) with $00
                 jsr set_ppu_addr_pg     ; 0 -> A; Y*$100+A -> PPU address
                 ldx #8
                 tay
@@ -255,118 +218,9 @@ fill_vram       sta ppu_data            ; write A to VRAM Y times
                 bne fill_vram
                 rts
 
-palette         ; copied backwards to all subpalettes
+palette         ; copied to all subpalettes
                 ; note: 2nd color of 1st sprite subpalette blinks and is used for cursors
-                db color_unused, color_unused, color_fg, color_bg
-
-                ; pattern table data
-                ; each line encodes 8 bytes (1st bitplane of 1 tile) in 2-9 bytes
-                ; (2nd bitplane is always zero)
-                ; generated from "pt-data.txt" using "pt-data-compress.py" (see it for the format)
-                ;
-pt_data         hex ff00                ; tile $20
-                hex fa100000            ; tile $21
-                hex 3f002828            ; tile $22
-                hex d628fefe00          ; tile $23
-                hex 547c1050141000      ; tile $24
-                hex 80c2c4081020468600  ; tile $25
-                hex 44443828102a3a00    ; tile $26
-                hex 3f001010            ; tile $27
-                hex 38200810100800      ; tile $28
-                hex 38082010102000      ; tile $29
-                hex 83004428fe2844      ; tile $2a
-                hex ee10fe00            ; tile $2b
-                hex f9000810            ; tile $2c
-                hex ef00fc              ; tile $2d
-                hex f9001818            ; tile $2e
-                hex 800204081020408000  ; tile $2f
-                hex 6c827c927c00        ; tile $30
-                hex bc10303800          ; tile $31
-                hex 927c0202808000      ; tile $32
-                hex 6c02fcfcfc00        ; tile $33
-                hex e082fe02020200      ; tile $34
-                hex 6080fefc0202fc00    ; tile $35
-                hex 927c8080828200      ; tile $36
-                hex 1e10fe040800        ; tile $37
-                hex 6c827c7c7c00        ; tile $38
-                hex 927c8282020200      ; tile $39
-                hex 990018181818        ; tile $3a
-                hex 990018180810        ; tile $3b
-                hex 8204081020100800    ; tile $3c
-                hex db00fefe            ; tile $3d
-                hex 8220100804081000    ; tile $3e
-                hex a87c0280001000      ; tile $3f
-                hex 30ba7c82bc807e00    ; tile $40
-                hex 6e827cfe00          ; tile $41
-                hex 6c42fc7cfc00        ; tile $42
-                hex 7c807e7e00          ; tile $43
-                hex 3882f88484f800      ; tile $44
-                hex 6c80fefcfe00        ; tile $45
-                hex 6e80fefc00          ; tile $46
-                hex 827e80808e828200    ; tile $47
-                hex ee82fe00            ; tile $48
-                hex 7c10383800          ; tile $49
-                hex f802827c00          ; tile $4a
-                hex 82828488f0888400    ; tile $4b
-                hex fc80fe00            ; tile $4c
-                hex 9e82c6ba00          ; tile $4d
-                hex c682e2928e00        ; tile $4e
-                hex 7c827c7c00          ; tile $4f
-                hex 0e80fc8282fc00      ; tile $50
-                hex 70827c8a867e00      ; tile $51
-                hex 6282fcfc888400      ; tile $52
-                hex 927c8080020200      ; tile $53
-                hex 7e10fe00            ; tile $54
-                hex fc827c00            ; tile $55
-                hex f08244281000        ; tile $56
-                hex f08292aa4400        ; tile $57
-                hex 8282442810284400    ; tile $58
-                hex 1e1082442800        ; tile $59
-                hex 82fe040810204000    ; tile $5a
-                hex 7c203c3c00          ; tile $5b
-                hex 808040201008040200  ; tile $5c
-                hex 7c043c3c00          ; tile $5d
-                hex 1f00102844          ; tile $5e
-                hex fd00fe              ; tile $5f
-                hex 3f001008            ; tile $60
-                hex c1007c027e827e      ; tile $61
-                hex 1c828080fcfc00      ; tile $62
-                hex c1007e8080807e      ; tile $63
-                hex 1c8202027e7e00      ; tile $64
-                hex c1007c82fc807c      ; tile $65
-                hex 5e100e7e00          ; tile $66
-                hex c0007c84847c0478    ; tile $67
-                hex 1e828080fc00        ; tile $68
-                hex be100000            ; tile $69
-                hex bc04004438          ; tile $6a
-                hex c040444870484400    ; tile $6b
-                hex fe1000              ; tile $6c
-                hex 1e920000fc00        ; tile $6d
-                hex 1e820000fc00        ; tile $6e
-                hex c1007c8282827c      ; tile $6f
-                hex c000bcc282fc8080    ; tile $70
-                hex c0007a86827e0202    ; tile $71
-                hex 1e800000fe00        ; tile $72
-                hex c1007c807c027c      ; tile $73
-                hex dc20fe1e00          ; tile $74
-                hex 3c8200007e00        ; tile $75
-                hex c1008282442810      ; tile $76
-                hex 3c9200006c00        ; tile $77
-                hex c100c6281028c6      ; tile $78
-                hex 388200007e027c      ; tile $79
-                hex c100fe081020fe      ; tile $7a
-                hex 6c100c600c00        ; tile $7b
-                hex ee100000            ; tile $7c
-                hex 6c10600c6000        ; tile $7d
-                hex 3f006698            ; tile $7e
-                hex c0042444fc402000    ; tile $7f
-                hex ffff                ; tile $80
-                hex c700ffffff          ; tile $81
-                hex 9f103854            ; tile $82
-                hex f9105438            ; tile $83
-                hex 83002040fe4020      ; tile $84
-                hex 83000804fe0408      ; tile $85
-                hex 00                  ; end of data
+                db color_bg, color_fg, color_hilite, color_unused
 
 macro nt_addr _nt, _y, _x
                 ; output name table address ($2000-$27bf), high byte first
@@ -381,23 +235,26 @@ strings         ; each string: PPU address high/low, characters, null terminator
                 db "Qalle's Brainfuck", 0
                 nt_addr 0, 6, 12
                 db "Program:", 0
-                nt_addr 0, 18, 4
-                db tile_uarr, "=+ ", tile_darr, "=- "
-                db tile_larr, "=< ", tile_rarr, "=> "
-                db "B=[ A=]", 0
+                nt_addr 0, 18, 3
+                db tile_uarr, "=+ ", tile_darr, "=-  "
+                db tile_larr, "=< ", tile_rarr, "=>  "
+                db tile_bupper, "=[ ", tile_aupper, "=]", 0
                 nt_addr 0, 20, 5
-                db "select+B=, select+A=.", 0
+                db tile_s, tile_e, tile_l, tile_e, tile_c, tile_t, "+", tile_bupper, "=, "
+                db tile_s, tile_e, tile_l, tile_e, tile_c, tile_t, "+", tile_aupper, "=.", 0
                 nt_addr 0, 22, 2
-                db "start=BkSp select+start=run", 0
+                db tile_s, tile_t, tile_a, tile_r, tile_t, "=BkSp "
+                db tile_s, tile_e, tile_l, tile_e, tile_c, tile_t, "+"
+                db tile_s, tile_t, tile_a, tile_r, tile_t, "=run", 0
                 ;
                 nt_addr 1, 3, 7
                 db "Qalle's Brainfuck", 0
                 nt_addr 1, 6, 12
                 db "Output:", 0
                 nt_addr 1, 18, 9
-                db "Input (", tile_uarr, tile_darr, tile_larr, tile_rarr, "A):", 0
+                db "Input (", tile_uarr, tile_darr, tile_larr, tile_rarr, tile_aupper, "):", 0
                 nt_addr 1, 27, 13
-                db "B=exit", 0
+                db tile_bupper, "=exit", 0
                 ;
                 db 0  ; end of all strings
 
@@ -911,3 +768,9 @@ set_ppu_regs    lda #$00                ; reset PPU scroll
 
                 pad $fffa, $ff
                 dw nmi, reset, irq      ; note: IRQ unused
+
+; --- CHR ROM -------------------------------------------------------------------------------------
+
+                base $0000
+                incbin "chr.bin"
+                pad $2000, $ff
