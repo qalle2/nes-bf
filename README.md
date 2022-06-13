@@ -22,9 +22,9 @@ Table of contents:
 * `snap*.png`: screenshots
 
 ## Features
-* maximum program size: 255 instructions
-* Brainfuck RAM size: 1 KiB
-* maximum output size: 256 bytes
+* maximum program size: 239 (8&times;30&minus;1) instructions
+* maximum output size: 240 (8&times;30) bytes
+* Brainfuck RAM size: 1,024 bytes
 * output speed: 1 character/frame
 
 ## Technical info
