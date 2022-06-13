@@ -4,8 +4,14 @@ infinite loop:
 delay:
     +[>+[+]<+]
 
+fill memory with increasing values:
+    +[>+]
+
 print bytes 0x00-0xff:
     .+[.+]
+
+typewriter:
+    +[,.]
 
 print "A" (0x41):
     ++++++++[>++++++++<-] >+.

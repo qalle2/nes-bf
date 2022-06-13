@@ -1,10 +1,5 @@
 ; Qalle's Brainfuck (NES, ASM6)
 
-; To do: don't print to first & last column:
-; - always filled with tile $00, incl. program & output area
-; - when user tries to type an instruction in the last column, advance program_len by 2
-; - when running, skip empty instructions
-
 ; --- Constants -----------------------------------------------------------------------------------
 
 ; notes:
@@ -29,9 +24,9 @@ prev_pad_status equ $11    ; joypad status on previous frame
 vram_buf_adrhi  equ $12    ; VRAM buffer - high byte of address ($00 = buffer is empty)
 vram_buf_adrlo  equ $13    ; VRAM buffer - low  byte of address
 vram_buf_value  equ $15    ; VRAM buffer - value
-program_len     equ $16    ; length of Brainfuck program (0-$fe)
+program_len     equ $16    ; length of Brainfuck program
 bf_pc           equ $17    ; program counter of Brainfuck program (preincremented)
-output_len      equ $19    ; number of characters printed by the Brainfuck program (0-$fe)
+output_len      equ $19    ; number of characters printed by the Brainfuck program
 keyb_x          equ $1a    ; cursor X position on virtual keyboard (0-15)
 keyb_y          equ $1b    ; cursor Y position on virtual keyboard (0-5)
 stack_ptr_copy  equ $1d    ; copy of stack pointer
@@ -143,6 +138,8 @@ reset           ; initialize the NES; see https://wiki.nesdev.org/w/index.php/In
                 inx
                 bne -
 
+                inc program_len         ; init nonzero var (1st column is always empty)
+
                 jsr wait_vbl_start      ; wait until next VBlank starts
 
                 ldy #$3f                ; set up palette (while still in VBlank; 8*4 bytes)
@@ -184,7 +181,7 @@ strings_end     ldx #(4-1)              ; draw horizontal bars in NT0 & NT1
 -               ldy horz_bars_hi,x
                 lda horz_bars_lo,x
                 jsr set_ppu_addr        ; Y*$100+A -> PPU address
-                ldy #32
+                ldy #30
                 lda #tile_hbar
                 jsr fill_vram           ; write A Y times
                 dex
@@ -269,8 +266,8 @@ strings         ; each string: PPU address high/low, characters, null terminator
 
                 ; VRAM addresses of horizontal bars (above/below Brainfuck code area in both
                 ; name tables)
-horz_bars_hi    dh $20e0, $2200, $24e0, $2600  ; high bytes
-horz_bars_lo    dl $20e0, $2200, $24e0, $2600  ; low  bytes
+horz_bars_hi    dh $20e1, $2201, $24e1, $2601  ; high bytes
+horz_bars_lo    dl $20e1, $2201, $24e1, $2601  ; low  bytes
 
 ; --- Main loop - common --------------------------------------------------------------------------
 
@@ -361,12 +358,17 @@ char_entry_end  lda program_len         ; update coordinates of input cursor spr
 run_program     inc program_mode        ; switch to mode_prepare_run1
                 rts                     ; (later to mode_prepare_run2 & mode_run)
 
-del_last_char   ldy program_len         ; if there's >= 1 instruction...
+del_last_char   ldy program_len         ; if program_len >= 2 (1st column is always empty)...
+                dey
                 beq char_entry_end
                 ;
-                ldy program_len
-                dey                     ; delete last instruction, tell NMI routine to redraw it
-                lda #$00
+                tya                     ; 1st & last columns are always empty
+                and #%00011111
+                bne +
+                dey
+                dey
+                ;
++               lda #$00                ; delete last instruction, tell NMI routine to redraw it
                 sta bf_program,y
                 sta vram_buf_value
                 sty program_len
@@ -376,15 +378,24 @@ del_last_char   ldy program_len         ; if there's >= 1 instruction...
                 ;
                 bne char_entry_end      ; unconditional
 
-enter_instr     ldy program_len         ; if program is < $ff characters...
-                cpy #$ff
+enter_instr     ldy program_len         ; if program_len < $fe (last column is always empty
+                cpy #$fe                ; and cursor takes up last tile in input area)...
                 beq char_entry_end
                 ;
                 lda bf_instrs,x         ; add instruction specified by X, tell NMI routine to
                 sta bf_program,y        ; draw it
                 sta vram_buf_value
                 sty vram_buf_adrlo
-                inc program_len
+                iny
+                ;
+                tya                     ; 1st & last columns are always empty
+                and #%00011111
+                cmp #%00011111
+                bne +
+                iny
+                iny
+                ;
++               sty program_len
                 lda #$21
                 sta vram_buf_adrhi      ; set this byte last to avoid race condition
                 ;
@@ -455,6 +466,7 @@ ml_prep_run2    ldy #$ff                ; hide edit cursor, reset Brainfuck prog
                 iny                     ; reset low byte of BF RAM pointer, output length,
                 sty bf_ram_ptr+0        ; keyboard cursor
                 sty output_len
+                inc output_len          ; 1st column is always empty
                 sty keyb_x
                 sty keyb_y
 
@@ -498,7 +510,7 @@ ml_run          lda pad_status          ; stop program if B pressed
 
                 lda bf_program,x        ; instruction -> A
 
-                ; process current instruction
+                ; process current instruction (may also be $00 if we're on 1st/last column)
                 ;
                 cmp #$2d                ; "-"
                 beq dec_value
@@ -514,8 +526,9 @@ ml_run          lda pad_status          ; stop program if B pressed
                 beq end_loop
                 cmp #$2e                ; "."
                 beq output
-                ;
-                inc program_mode        ; ","; input value to RAM (switch to mode_input)
+                cmp #$2c                ; ","
+                bne instr_done
+                inc program_mode        ; input value to RAM (switch to mode_input)
                 ;
 instr_done      stx bf_pc               ; store new program counter
                 lda output_len          ; update coordinates of output cursor sprite
@@ -574,18 +587,30 @@ output          lda (bf_ram_ptr),y      ; if newline ($0a)...
                 lda output_len          ; move output cursor to start of next line
                 adc #(32-1)             ; carry is always set
                 and #%11100000
+                beq to_ended_mode       ; if output area full, end program (ends with RTS)
                 sta output_len
-                jmp ++
+                inc output_len          ; 1st column is always empty
+                bne instr_done          ; unconditional
                 ;
 +               sta vram_buf_value      ; otherwise output value from RAM via NMI routine
                 lda output_len
                 sta vram_buf_adrlo
-                lda #$25
-                sta vram_buf_adrhi      ; set this byte last to avoid race condition
                 inc output_len
                 ;
-++              beq to_ended_mode       ; if $100 characters printed, end program (ends with RTS)
-                bne instr_done          ; unconditional
+                lda output_len          ; 1st & last columns are always empty
+                and #%00011111
+                cmp #%00011111
+                bne +
+                inc output_len
+                inc output_len
+                ;
++               lda #$25
+                sta vram_buf_adrhi      ; set this byte last to avoid race condition
+                lda output_len          ; if output area full, end program
+                cmp #$01
+                bne +
+                jmp to_ended_mode       ; ends with RTS
++               jmp instr_done
 
 ; --- Main loop - Brainfuck program waiting for input ---------------------------------------------
 
