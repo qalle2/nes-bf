@@ -1,26 +1,38 @@
+prints nothing:
+    (empty program)
+    []
+    +-<>[[][]]
+
+error in brackets:
+    [
+    ]
+    ][
+
 infinite loop:
     +[]
 
-delay:
+four delay loops (a few seconds each):
     +[>+[+]<+]
+    -[<-[-]>-]
+    +[>>>>>>>>+++++]
+    -[<<<<<<<<-----]
 
-fill memory with increasing values:
-    +[>+]
-
-print bytes 0x00-0xff:
+print bytes increasing from 0x00:
     .+[.+]
 
-typewriter:
-    +[,.]
+print bytes decreasing from 0xff:
+    -.[-.]
 
-print "A" (0x41):
+two ways to print "A" (0x41):
     ++++++++[>++++++++<-] >+.
-or:
     ++++[>++++<-] >[>++++<-] >+.
-
-input characters (lower case letters), print them in upper case; space to quit:
-    +[,>++++ [<-------->-] <.]
 
 print "Hello, World!\n" (from Wikipedia):
     ++++++++[ > ++++[ >++>+++>+++>+<<<< -] >+>+>->>+[<]< -]
     >>. >---.+++++++..+++. >>. <-. <.+++.------.--------. >>+. >++.
+
+typewriter:
+    +[,.]
+
+input characters (lower case letters), print them in upper case; space to quit:
+    +[,>++++ [<-------->-] <.]
