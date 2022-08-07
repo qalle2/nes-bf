@@ -100,7 +100,6 @@ endm
 
 reset           ; initialize the NES
                 ; see https://wiki.nesdev.org/w/index.php/Init_code
-                ;
                 sei                     ; ignore IRQs
                 cld                     ; disable decimal mode
                 ldx #%01000000
@@ -237,7 +236,7 @@ palette         ; copied to all subpalettes
 
 strings         ; each string: PPU address high/low, characters, terminator (0)
                 ; address high 0 terminates string data
-                ;
+
                 dwbe $2000+3*32+7
                 db   "Qalle's Brainfuck"
                 db   0
@@ -260,7 +259,7 @@ strings         ; each string: PPU address high/low, characters, terminator (0)
                 db   $8d, $8a, $8b, $8a, $89, $8e, "+"
                 db   $8d, $8e, $88, $8c, $8e, "=run"
                 db   0
-                ;
+
                 dwbe $2400+3*32+7
                 db   "Qalle's Brainfuck"
                 db   0
@@ -273,7 +272,7 @@ strings         ; each string: PPU address high/low, characters, terminator (0)
                 dwbe $2400+27*32+13
                 db   $87, "=exit"
                 db   0
-                ;
+
                 db   0                  ; end of all strings
 
                 if $ - strings > 256
@@ -291,13 +290,13 @@ main_loop       ; to avoid missing the flag being set by NMI routine,
                 ; clear and read it using a single instruction
                 asl nmi_done
                 bcs +
-                ;
+
                 lda program_mode        ; not 1st round after VBlank;
                 cmp #mode_run           ; only run mode-specific stuff
                 bne main_loop           ; in run mode
                 jsr ml_run
                 jmp main_loop
-                ;
+
 +               jsr once_per_frame      ; 1st round after VBlank;
                 jmp main_loop           ; run once-per-frame stuff
 
@@ -333,7 +332,7 @@ once_per_frame  ; stuff that's done only once per frame
                 ; note: RTS in the subs below will act like RTS in this sub
                 ; see https://www.nesdev.org/wiki/Jump_table
                 ; and https://www.nesdev.org/wiki/RTS_Trick
-                ;
+
                 ldx program_mode        ; push target address minus one,
                 lda jump_table_hi,x     ; high byte first
                 pha
@@ -356,13 +355,13 @@ ml_edit         lda #%10000000          ; show NT0
                 lda pad_status          ; react to buttons
                 cmp prev_pad_status     ; skip if joypad status not changed
                 beq char_entry_end
-                ;
+
                 cmp #(pad_sl|pad_st)
                 beq try_to_run
-                ;
+
                 cmp #pad_st
                 beq backspace
-                ;
+
                 ldx #(8-1)
 -               lda edit_buttons,x      ; enter instruction if
                 cmp pad_status          ; corresponding button pressed
@@ -378,17 +377,17 @@ try_to_run      lda #mode_prep1
 backspace       ldy program_len         ; if program_len >= 2
                 dey                     ; (1st column is always empty)...
                 beq char_entry_end
-                ;
+
                 tya                     ; 1st & last columns are always empty
                 and #%00011111
                 bne +
                 dey
                 dey
-                ;
+
 +               lda #$00                ; delete last instruction
                 sta bf_program,y
                 sty program_len
-                ;
+
                 lda #$00                ; tell NMI routine to redraw tile
                 sta vram_buf_value
                 lda #1
@@ -396,13 +395,13 @@ backspace       ldy program_len         ; if program_len >= 2
                 sty vram_buf_adrlo
                 lda #$21
                 sta vram_buf_adrhi      ; set this last to avoid race condition
-                ;
+
                 bne char_entry_end      ; unconditional
 
 enter_instr     ldy program_len         ; if program_len < $fe (last column is
                 cpy #$fe                ; always empty, cursor takes up
                 beq char_entry_end      ; last tile in input area)...
-                ;
+
                 lda bf_instrs,x         ; tell NMI routine to redraw tile
                 sta vram_buf_value
                 lda #1
@@ -410,7 +409,7 @@ enter_instr     ldy program_len         ; if program_len < $fe (last column is
                 sty vram_buf_adrlo
                 lda #$21
                 sta vram_buf_adrhi      ; set this last to avoid race condition
-                ;
+
                 lda bf_instrs,x         ; store instruction
                 sta bf_program,y
                 iny
@@ -442,24 +441,24 @@ ml_prep1        ; For each bracket in BF program, store index of corresponding
                 ; - trashes: sp_copy, bottom half of stack ($0100-$017f)
                 ; Note: an interrupt which uses stack must never fire during
                 ; this sub.
-                ;
+
                 tsx                     ; store original stack pointer
                 stx sp_copy
                 ldx #$7f                ; use bottom half of stack for
                 txs                     ; currently open brackets
-                ldy #$ff                ; Y = current program index
-                ;                       ; (preincremented)
+                ldy #$ff                ; Y = current program index (preinc'd)
+
 -               iny                     ; next instruction
                 cpy program_len
                 bne +
-                ;
+
                 tsx                     ; end of BF program
                 inx
                 bpl bracket_error       ; missing "]" (SP != $7f)
                 lda #mode_prep2         ; brackets valid; proceed
                 sta program_mode
                 bpl brackets_ok         ; unconditional
-                ;
+
 +               lda bf_program,y
                 cmp #'['
                 bne +
@@ -468,7 +467,7 @@ ml_prep1        ; For each bracket in BF program, store index of corresponding
                 tya                     ; (SP = $ff)
                 pha                     ; push current index
                 jmp -
-                ;
+
 +               cmp #']'
                 bne -
                 pla                     ; pull corresponding index
@@ -479,11 +478,11 @@ ml_prep1        ; For each bracket in BF program, store index of corresponding
                 tya
                 sta brackets,x
                 jmp -
-                ;
+
 bracket_error   lda #mode_edit          ; error in brackets; return to editor
                 sta program_mode
                 bpl +                   ; unconditional
-                ;
+
 brackets_ok     ; tell NMI routine to clear top half of BF output area
                 lda #$80
                 sta vram_buf_count
@@ -492,7 +491,7 @@ brackets_ok     ; tell NMI routine to clear top half of BF output area
                 sta vram_buf_adrlo
                 lda #$25
                 sta vram_buf_adrhi      ; set this last to avoid race condition
-                ;
+
 +               ldx sp_copy             ; restore original SP
                 txs
                 rts
@@ -583,7 +582,7 @@ ml_run          lda #%10000001          ; show NT1
 
 dec_value       lda #$ff                ; decrement byte at RAM pointer
                 bne +                   ; unconditional
-                ;
+
 inc_value       lda #1                  ; increment byte at RAM pointer
 +               ldy #0
                 clc
@@ -597,7 +596,7 @@ dec_ptr         dec bf_ram_ptr+0        ; decrement RAM pointer
                 bne instr_done
                 dec bf_ram_ptr+1
                 bpl +                   ; unconditional
-                ;
+
 inc_ptr         inc bf_ram_ptr+0        ; increment RAM pointer
                 bne instr_done
                 inc bf_ram_ptr+1
@@ -612,7 +611,7 @@ start_loop      ; jump to corresponding "]" if byte at RAM pointer is zero
                 lda (bf_ram_ptr),y
                 bne instr_done
                 beq +                   ; unconditional
-                ;
+
 end_loop        ; jump to corresponding "[" if byte at RAM pointer is nonzero
                 ldy #0
                 lda (bf_ram_ptr),y
@@ -627,7 +626,7 @@ input           ; read input from virtual keyboard to byte at RAM pointer
                 bpl instr_done          ; unconditional
 
 output          ; output byte at RAM pointer to output area
-                ;
+
                 ldy #0
                 lda (bf_ram_ptr),y      ; if newline ($0a)...
                 cmp #$0a
@@ -639,21 +638,21 @@ output          ; output byte at RAM pointer to output area
                 sta output_len          ; (code ends with RTS)
                 inc output_len          ; 1st column is always empty
                 bne instr_done          ; unconditional
-                ;
+
 +               sta vram_buf_value      ; otherwise output RAM value via NMI
                 lda #1
                 sta vram_buf_count
                 lda output_len
                 sta vram_buf_adrlo
                 inc output_len
-                ;
+
                 lda output_len          ; 1st & last columns are always empty
                 and #%00011111
                 cmp #%00011111
                 bne +
                 inc output_len
                 inc output_len
-                ;
+
 +               lda #$25
                 sta vram_buf_adrhi      ; set this last to avoid race condition
                 lda output_len          ; if output area full, end program
@@ -697,7 +696,7 @@ ml_input        ; ignore buttons if anything was pressed on last frame
 keyb_right      ldx keyb_x
                 inx
                 bpl +                   ; unconditional
-                ;
+
 keyb_left       ldx keyb_x
                 dex
 +               txa
@@ -711,7 +710,7 @@ keyb_down       ldx keyb_y
                 bne +
                 ldx #0
                 beq +                   ; unconditional
-                ;
+
 keyb_up         dec keyb_y
                 bpl ++
                 ldx #(6-1)
@@ -719,7 +718,7 @@ keyb_up         dec keyb_y
 ++              jmp upd_keyb_cursor     ; ends with RTS
 
 keyb_input      ; store character at cursor to BF RAM
-                ;
+
                 lda keyb_y              ; get character code
                 asl a
                 asl a
@@ -727,11 +726,11 @@ keyb_input      ; store character at cursor to BF RAM
                 asl a
                 adc #$20                ; carry is always clear
                 ora keyb_x
-                ;
+
                 cmp #$7f                ; change newline symbol to newline
                 bne +
                 lda #$0a
-                ;
+
 +               ldy #0                  ; store character code
                 sta (bf_ram_ptr),y
                 lda #mode_run           ; return to run mode
@@ -739,14 +738,14 @@ keyb_input      ; store character at cursor to BF RAM
                 rts
 
 upd_keyb_cursor ; update keyboard cursor sprite
-                ;
+
                 lda keyb_y              ; Y position
                 asl a
                 asl a
                 asl a
                 adc #(20*8-1)           ; carry is always clear
                 sta sprite_data+0+0
-                ;
+
                 lda keyb_x              ; X position
                 asl a
                 asl a
@@ -770,14 +769,14 @@ to_edit_mode    lda #mode_edit          ; switch to edit mode
 
 upd_io_cursor   ; update input/output cursor sprite
                 ; in: A = input/output length
-                ;
+
                 pha                     ; Y position
                 and #%11100000
                 lsr a
                 lsr a
                 adc #(8*8-1)            ; carry is always clear
                 sta sprite_data+0+0
-                ;
+
                 pla                     ; X position
                 asl a
                 asl a
