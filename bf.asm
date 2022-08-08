@@ -7,7 +7,7 @@
 ; - Only the first sprite slot is actually used, and the other slots only need
 ;   their Y positions to be set to $ff, so the OAM page accommodates many other
 ;   variables at addresses not divisible by 4 ($05-$07, $09-$0b, $0d-$0f, ...).
-; - "VRAM buffer" = what to write to PPU on next VBlank.
+; - "PPU buffer" = what to write to PPU memory on next VBlank.
 ; - Bottom half of stack ($0100-$017f) is used for other purposes by ml_prep1.
 ; - nmi_done: did the NMI routine just run? Used for once-per-frame stuff;
 ;   set by NMI; read & cleared at the start of main loop.
@@ -21,10 +21,10 @@ ppu_ctrl_copy   equ $0a    ; copy of ppu_ctrl
 frame_counter   equ $0b    ; for blinking cursors
 pad_status      equ $0d    ; joypad status
 prev_pad_status equ $0e    ; joypad status on previous frame
-vram_buf_adrhi  equ $0f    ; VRAM buffer - high byte of address (0 = nothing)
-vram_buf_adrlo  equ $11    ; VRAM buffer - low  byte of address
-vram_buf_value  equ $12    ; VRAM buffer - value
-vram_buf_count  equ $13    ; VRAM buffer - repeat count
+ppu_buf_adrhi   equ $0f    ; PPU buffer - high byte of address (0 = nothing)
+ppu_buf_adrlo   equ $11    ; PPU buffer - low  byte of address
+ppu_buf_value   equ $12    ; PPU buffer - value
+ppu_buf_count   equ $13    ; PPU buffer - repeat count
 program_len     equ $15    ; length of BF program
 bf_pc           equ $16    ; program counter of BF program (preincremented)
 output_len      equ $17    ; number of characters printed by BF program
@@ -33,7 +33,7 @@ keyb_y          equ $1a    ; cursor Y position on virtual keyboard (0-5)
 sp_copy         equ $1b    ; copy of stack pointer
 bf_program      equ $0200  ; BF program ($100 bytes)
 brackets        equ $0300  ; target addresses of "[" and "]" ($100 bytes)
-bf_ram          equ $0400  ; RAM of BF program ($400 bytes; must be at $xx00)
+bf_ram          equ $0400  ; RAM of BF program ($400 bytes; must be at $0400)
 
 ; memory-mapped registers
 ppu_ctrl        equ $2000
@@ -48,16 +48,6 @@ oam_dma         equ $4014
 snd_chn         equ $4015
 joypad1         equ $4016
 joypad2         equ $4017
-
-; joypad button bitmasks
-pad_a           equ 1<<7  ; A
-pad_b           equ 1<<6  ; B
-pad_sl          equ 1<<5  ; select
-pad_st          equ 1<<4  ; start
-pad_u           equ 1<<3  ; up
-pad_d           equ 1<<2  ; down
-pad_l           equ 1<<1  ; left
-pad_r           equ 1<<0  ; right
 
 ; values for program_mode (must be 0, 1, ... because they're used as indexes
 ; to jump table)
@@ -156,7 +146,7 @@ init_ram        ; initialize main RAM
                 sta program_len
                 jmp upd_io_cursor       ; ends with RTS
 
-init_palette    ; initialize palette (while still in VBlank)
+init_palette    ; copy initial palette (while still in VBlank)
 
                 ldy #$3f
                 lda #$00
@@ -164,7 +154,7 @@ init_palette    ; initialize palette (while still in VBlank)
 
                 ldy #8                  ; copy same colors to all subpalettes
 --              ldx #0
--               lda palette,x
+-               lda initial_palette,x
                 sta ppu_data
                 inx
                 cpx #4
@@ -173,11 +163,10 @@ init_palette    ; initialize palette (while still in VBlank)
                 bne --
                 rts
 
-palette         ; initial palette; copied to all subpalettes
-                ; note: 2nd color of 1st sprite subpal blinks, used for cursors
-                db $0f                  ; background (black)
-                db $30                  ; foreground (white)
-                db $28                  ; highlight  (yellow)
+initial_palette ; copied to all subpalettes
+                db $0f                  ; background   (black)
+                db $30                  ; foreground 1 (white)
+                db $28                  ; foreground 2 (yellow)
                 db $00                  ; unused
 
 init_vram       ; initialize VRAM
@@ -371,15 +360,15 @@ ml_edit         lda #%10000000          ; show NT0
                 cmp prev_pad_status     ; skip if joypad status not changed
                 beq +
 
-                cmp #(pad_sl|pad_st)
+                cmp #%00110000          ; select & start:
                 beq try_to_run          ; try to run BF program
 
-                cmp #pad_st
-                beq backspace           ; try to delete last character
+                cmp #%00010000          ; start: try to delete last character
+                beq backspace
 
+                ; try to enter an instruction if corresponding button pressed
                 ldx #(8-1)
--               lda edit_buttons,x      ; enter instruction if
-                cmp pad_status          ; corresponding button pressed
+-               cmp edit_buttons,x
                 beq enter_instr
                 dex
                 bpl -
@@ -410,31 +399,35 @@ backspace       ; try to delete last instruction
                 sty program_len
 
                 lda #$00                ; tell NMI routine to redraw tile
-                sta vram_buf_value
+                sta ppu_buf_value
                 lda #1
-                sta vram_buf_count
-                sty vram_buf_adrlo
+                sta ppu_buf_count
+                sty ppu_buf_adrlo
                 lda #$21
-                sta vram_buf_adrhi      ; set this last to avoid race condition
+                sta ppu_buf_adrhi       ; set this last to avoid race condition
 
-                jmp char_entry_end      ; ends with RTS
+                lda program_len         ; update input cursor sprite
+                jmp upd_io_cursor       ; ends with RTS
 
-enter_instr     ; exit if program area full (last column is always empty,
-                ; cursor takes up last tile in input area)
+enter_instr     ; try to enter a BF instruction (X)
+
+                ; exit if no space (last 2 tiles taken by cursor, empty column)
                 ldy program_len
                 cpy #$fe
                 bne +
                 rts
 
-+               lda bf_instrs,x         ; tell NMI routine to redraw tile
-                sta vram_buf_value
++               ; tell NMI routine to redraw tile
+                lda bf_instrs,x
+                sta ppu_buf_value
                 lda #1
-                sta vram_buf_count
-                sty vram_buf_adrlo
+                sta ppu_buf_count
+                sty ppu_buf_adrlo
                 lda #$21
-                sta vram_buf_adrhi      ; set this last to avoid race condition
+                sta ppu_buf_adrhi       ; set this last to avoid race condition
 
-                lda bf_instrs,x         ; store instruction
+                ; store instruction
+                lda bf_instrs,x
                 sta bf_program,y
                 iny
                 tya                     ; 1st & last columns are always empty
@@ -444,15 +437,19 @@ enter_instr     ; exit if program area full (last column is always empty,
                 iny
                 iny
 +               sty program_len
-                ; fall through
 
-char_entry_end  lda program_len         ; update input cursor sprite
+                tya                     ; update input cursor sprite
                 jmp upd_io_cursor       ; ends with RTS
 
                 ; BF instructions and corresponding buttons in edit mode
-edit_buttons    db pad_d, pad_u, pad_l, pad_r, pad_b, pad_a
-                db pad_sl|pad_b, pad_sl|pad_a
-bf_instrs       db '-', '+', '<', '>', '[', ']', ',', '.'
+bf_instrs       db '-', '+'
+                db '<', '>'
+                db '[', ']'
+                db ',', '.'
+edit_buttons    db %00000100, %00001000  ; down, up
+                db %00000010, %00000001  ; left, right
+                db %01000000, %10000000  ; B, A
+                db %01100000, %10100000  ; select+B, select+A
 
 ; --- Main loop - prepare to run, part 1/2 ------------------------------------
 
@@ -462,12 +459,12 @@ ml_prep1        jsr find_brackets       ; find brackets (carry = error)
                 ; brackets OK
 
                 lda #$80                ; tell NMI routine to clear top half
-                sta vram_buf_count      ; of BF output area
+                sta ppu_buf_count       ; of BF output area
                 lda #$00
-                sta vram_buf_value
-                sta vram_buf_adrlo
+                sta ppu_buf_value
+                sta ppu_buf_adrlo
                 lda #$25
-                sta vram_buf_adrhi      ; set this last to avoid race condition
+                sta ppu_buf_adrhi       ; set this last to avoid race condition
 
                 lda #mode_prep2         ; proceed to next mode
                 sta program_mode
@@ -480,9 +477,8 @@ ml_prep1        jsr find_brackets       ; find brackets (carry = error)
 
 find_brackets   ; For each bracket ("[", "]") in BF program, store index of
                 ; corresponding bracket in another array.
-                ; - in: bf_program (array), program_len
-                ; - out: brackets (array), carry (0 = no error, 1 = error)
-                ; - trashes: bottom half of stack ($0100-$017f)
+                ; out: brackets (array), carry (0 = no error, 1 = error)
+                ; trashes: bottom half of stack ($0100-$017f)
                 ; Note: an interrupt which uses stack must never fire during
                 ; this sub.
 
@@ -546,33 +542,33 @@ ml_prep2        lda #$ff
                 sta keyb_x              ; reset keyboard cursor
                 sta keyb_y
 
-                lda #>bf_ram            ; reset BF RAM pointer
-                sta bf_ram_ptr+1
-
                 lda #1
                 sta output_len          ; 1st column is always empty
                 jsr upd_io_cursor       ; update output cursor
 
-                ; clear BF RAM
+                ; clear BF RAM and leave pointer at its beginning
+                lda #>(bf_ram+$400)
+                sta bf_ram_ptr+1
                 lda #$00
-                tax
--               sta bf_ram+$000,x
-                sta bf_ram+$100,x
-                sta bf_ram+$200,x
-                sta bf_ram+$300,x
-                inx
+                tay
+                ldx #4
+--              dec bf_ram_ptr+1
+-               sta (bf_ram_ptr),y
+                iny
                 bne -
+                dex
+                bne --
 
                 ; tell NMI routine to clear bottom half of BF output area
-                lda #$80
-                sta vram_buf_count
-                sta vram_buf_adrlo
                 lda #$00
-                sta vram_buf_value
+                sta ppu_buf_value
+                lda #$80
+                sta ppu_buf_count
+                sta ppu_buf_adrlo
                 lda #$25
-                sta vram_buf_adrhi      ; set this last to avoid race condition
+                sta ppu_buf_adrhi       ; set this last to avoid race condition
 
-                lda #mode_run           ; switch to run mode
+                lda #mode_run           ; proceed to next mode
                 sta program_mode
                 rts
 
@@ -587,17 +583,18 @@ ml_run          lda #%10000001          ; show NT1
                 sta ppu_ctrl_copy
 
                 lda pad_status          ; stop program if B pressed
-                cmp #pad_b
+                cmp #%01000000
                 bne +
                 jmp to_edit_mode        ; ends with RTS
 
-+               ; exit if NMI routine hasn't flushed VRAM buffer yet
-                lda vram_buf_adrhi
++               ; exit if NMI routine hasn't flushed PPU buffer yet
+                lda ppu_buf_adrhi
                 bne ++
 
-                inc bf_pc               ; incremented PC -> X
+                ; increment BF PC; end program if end reached
+                inc bf_pc
                 ldx bf_pc
-                cpx program_len         ; end program if end reached
+                cpx program_len
                 bne +
                 jmp end_program         ; ends with RTS
 
@@ -608,9 +605,9 @@ ml_run          lda #%10000001          ; show NT1
                 cmp #$2b                ; "+"
                 beq inc_value
                 cmp #$3c                ; "<"
-                beq dec_ptr
+                beq dec_pointer
                 cmp #$3e                ; ">"
-                beq inc_ptr
+                beq inc_pointer
                 cmp #'['
                 beq start_loop
                 cmp #']'
@@ -621,11 +618,11 @@ ml_run          lda #%10000001          ; show NT1
                 beq output
 ++              rts
 
-dec_value       ; decrement byte at RAM pointer
+dec_value       ; decrement value at RAM pointer
                 lda #$ff
                 jmp +
 
-inc_value       ; increment byte at RAM pointer
+inc_value       ; increment value at RAM pointer
                 lda #1
 +               ldy #0
                 clc
@@ -633,35 +630,27 @@ inc_value       ; increment byte at RAM pointer
                 sta (bf_ram_ptr),y
                 rts
 
-dec_ptr         ; decrement RAM pointer
+dec_pointer     ; decrement RAM pointer
 
                 dec bf_ram_ptr+0
                 lda bf_ram_ptr+0
                 cmp #$ff
-                bne +
+                bne ++
 
                 dec bf_ram_ptr+1
-                lda bf_ram_ptr+1
-                cmp #>bf_ram
-                bcs +
+                jmp +
 
-                lda #>(bf_ram+$300)
-                sta bf_ram_ptr+1
-+               rts
-
-inc_ptr         ; increment RAM pointer
+inc_pointer     ; increment RAM pointer
 
                 inc bf_ram_ptr+0
-                bne +
-
+                bne ++
                 inc bf_ram_ptr+1
-                lda bf_ram_ptr+1
-                cmp #>(bf_ram+$400)
-                bne +
 
-                lda #>bf_ram
++               lda bf_ram_ptr+1        ; clamp to $04-$07
+                and #%00000011
+                ora #%00000100
                 sta bf_ram_ptr+1
-+               rts
+++              rts
 
 start_loop      ; jump to corresponding "]" if byte at RAM pointer is zero
                 ldy #0
@@ -699,11 +688,11 @@ output          ; output byte at RAM pointer to output area
                 inc output_len          ; 1st column is always empty
                 jmp ++
 
-+               sta vram_buf_value      ; otherwise output RAM value via NMI
++               sta ppu_buf_value       ; otherwise output RAM value via NMI
                 lda #1
-                sta vram_buf_count
+                sta ppu_buf_count
                 lda output_len
-                sta vram_buf_adrlo
+                sta ppu_buf_adrlo
                 inc output_len
 
                 lda output_len          ; 1st & last columns are always empty
@@ -714,7 +703,7 @@ output          ; output byte at RAM pointer to output area
                 inc output_len
 
 +               lda #$25
-                sta vram_buf_adrhi      ; set this last to avoid race condition
+                sta ppu_buf_adrhi       ; set this last to avoid race condition
                 lda output_len          ; if output area full, end program
                 cmp #1
                 beq end_program         ; ends with RTS
@@ -722,12 +711,15 @@ output          ; output byte at RAM pointer to output area
 ++              lda output_len          ; update output cursor sprite
                 jmp upd_io_cursor       ; ends with RTS
 
-end_program     lda #mode_ended         ; end program
-                sta program_mode
+end_program     ; end program
+
                 lda #(27*8-1)           ; move cursor next to "B=exit" text
                 sta sprite_data+0+0
                 lda #(19*8)
                 sta sprite_data+0+3
+
+                lda #mode_ended
+                sta program_mode
                 rts
 
 ; --- Main loop - BF program waiting for input --------------------------------
@@ -819,19 +811,18 @@ upd_keyb_cursor ; update keyboard cursor sprite
 ; --- Main loop - BF program ended --------------------------------------------
 
 ml_ended        lda pad_status          ; if B pressed, switch to edit mode
-                and #pad_b
+                and #%01000000
                 bne to_edit_mode        ; ends with RTS
                 rts
 
-; --- Main loop - Subs used in many modes -------------------------------------
-
 to_edit_mode    ; switch to edit mode
+
+                lda program_len
+                jsr upd_io_cursor
 
                 lda #mode_edit
                 sta program_mode
-
-                lda program_len
-                jmp upd_io_cursor       ; ends with RTS
+                rts
 
 upd_io_cursor   ; update input/output cursor sprite
                 ; in: A = input/output length
@@ -868,7 +859,7 @@ nmi             pha                     ; push A, X, Y
                 lda #>sprite_data
                 sta oam_dma
 
-                jsr flush_vram_buf      ; flush VRAM buffer
+                jsr flush_ppu_buf       ; flush PPU buffer
                 jsr set_ppu_regs        ; set ppu_scroll/ppu_ctrl/ppu_mask
 
                 ; set flag to let once-per-frame stuff run
@@ -884,20 +875,32 @@ nmi             pha                     ; push A, X, Y
 
 irq             rti                     ; IRQ unused
 
-flush_vram_buf  ; flush VRAM buffer if address != $00xx
+flush_ppu_buf   ; flush PPU buffer if address != $00xx
 
-                ldy vram_buf_adrhi
-                beq +
-                lda vram_buf_adrlo
+                ldy ppu_buf_adrhi       ; exit if empty
+                beq ++
+
+                lda ppu_buf_adrlo
                 jsr set_ppu_addr        ; Y*$100+A -> PPU address
 
-                lda vram_buf_value
-                ldy vram_buf_count
-                jsr fill_vram           ; write A Y times
+                ; count>>1 -> Y, count&1 -> carry, value -> A
+                lda ppu_buf_count
+                lsr a
+                tay
+                lda ppu_buf_value
+
+                ; write value to PPU ppu_buf_count times, twice per round
+                bcc ppu_write_loop
+                iny                     ; odd count
+                jmp +
+ppu_write_loop  sta ppu_data
++               sta ppu_data
+                dey
+                bne ppu_write_loop
 
                 lda #$00
-                sta vram_buf_adrhi
-+               rts
+                sta ppu_buf_adrhi
+++              rts
 
 set_ppu_addr    sty ppu_addr            ; Y*$100+A -> PPU address
                 sta ppu_addr
