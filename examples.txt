@@ -27,12 +27,5 @@ two ways to print "A" (0x41):
     ++++++++[>++++++++<-] >+.
     ++++[>++++<-] >[>++++<-] >+.
 
-print "Hello, World!\n" (from Wikipedia):
-    ++++++++[ > ++++[ >++>+++>+++>+<<<< -] >+>+>->>+[<]< -]
-    >>. >---.+++++++..+++. >>. <-. <.+++.------.--------. >>+. >++.
-
 typewriter:
     +[,.]
-
-input characters (lower case letters), print them in upper case; space to quit:
-    +[,>++++ [<-------->-] <.]

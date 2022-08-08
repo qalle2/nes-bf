@@ -1,6 +1,8 @@
 *.bin
 *.cdl
 *.dbg
+*.fm2
 *.nes
 *.nl
+*.tar
 *.tmp

@@ -13,13 +13,16 @@ Table of contents:
 * [References](#references)
 
 ## List of files
+* `*.bf`: long Brainfuck programs
 * `assemble.sh`: a Linux script that assembles the program (warning: deletes files)
 * `bf.asm`: source code (assembles with [ASM6](https://www.romhacking.net/utilities/674/))
 * `bf.nes.gz`: the assembled program (iNES format, gzip compressed)
 * `chr.bin.gz`: CHR ROM data (gzip compressed)
 * `chr.png`: CHR ROM data as an image (can be encoded with `nes_chr_encode.py` in my [NES utilities](https://github.com/qalle2/nes-util))
-* `examples.txt`: Brainfuck programs
+* `examples.txt`: short Brainfuck programs
+* `movies.tar.gz`: FCEUX movie files that enter a Brainfuck program into the NES program
 * `snap*.png`: screenshots
+* `txt2fm2.py`: a Python script that converts a Brainfuck program into an FCEUX movie file that enters the Brainfuck program into the NES program
 
 ## Features
 * maximum program size: 239 (8&times;30&minus;1) instructions
